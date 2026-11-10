@@ -16,7 +16,7 @@ $p = Start-Process msiexec.exe -ArgumentList @('/i', "`"$Msi`"", '/passive', '/n
 Remove-Item $Msi -ErrorAction SilentlyContinue
 
 switch ($p.ExitCode) {
-    0       { Write-Host "Selesai! Buka DG J-Code dari Start Menu." -ForegroundColor Green }
+    0       { Write-Host "Selesai! DG J-Code sudah ada di Desktop & Start Menu." -ForegroundColor Green }
     3010    { Write-Host "Selesai. Restart komputer untuk menyelesaikan instalasi." -ForegroundColor Yellow }
     1602    { Write-Host "Instalasi dibatalkan." -ForegroundColor Yellow }
     default { throw "Instalasi gagal (kode $($p.ExitCode))." }
