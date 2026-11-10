@@ -8,7 +8,7 @@ $Msi   = Join-Path $env:TEMP $Asset
 [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
 $ProgressPreference = 'SilentlyContinue'   # unduhan jauh lebih cepat di PowerShell 5.1
 
-Write-Host "Mengunduh DG J-Code..." -ForegroundColor Cyan
+Write-Host "Mengunduh DG J-Code... Tunggu yak😊" -ForegroundColor Cyan
 Invoke-WebRequest -Uri $Url -OutFile $Msi -UseBasicParsing
 
 Write-Host "Memasang..." -ForegroundColor Cyan
