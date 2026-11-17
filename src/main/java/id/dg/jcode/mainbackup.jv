@@ -1,0 +1,112 @@
+package id.dg.jcode;
+
+import id.dg.jcode.settings.Settings;
+import id.dg.jcode.ui.MainFrame;
+import id.dg.jcode.ui.splash.SplashWindow;
+import id.dg.jcode.ui.theme.ThemeManager;
+
+import javax.swing.JOptionPane;
+import javax.swing.SwingUtilities;
+import javax.swing.SwingWorker;
+import java.io.PrintWriter;
+import java.io.StringWriter;
+import java.util.List;
+import java.util.concurrent.ExecutionException;
+
+/**
+ * Titik masuk aplikasi.
+ *
+ * Urutan start:
+ * 1. Baca pengaturan (tema) dari file lokal.
+ * 2. Pasang tema FlatLaf, lalu tampilkan splash secepat mungkin.
+ * 3. Siapkan komponen di thread latar belakang (SwingWorker) agar UI tidak macet.
+ * 4. Setelah siap dan splash sudah tampil minimal 2 detik, buka jendela utama.
+ *
+ * Jika pembuatan jendela utama gagal, splash ditutup dan pesan error ditampilkan,
+ * sehingga aplikasi tidak pernah "macet" di splash tanpa penjelasan.
+ */
+public final class Main {
+
+    /** Durasi minimal splash dalam milidetik. */
+    private static final long MIN_SPLASH_MS = 4500L;
+
+    private Main() {
+    }
+
+    public static void main(String[] args) {
+        Settings settings = Settings.load();
+        SwingUtilities.invokeLater(() -> start(settings));
+    }
+
+    private static void start(Settings settings) {
+        ThemeManager.install(settings.getTheme());
+
+        SplashWindow splash = new SplashWindow();
+        splash.showWithFadeIn();
+
+        new SwingWorker<Void, String>() {
+            @Override
+            protected Void doInBackground() {
+                publish("Menyiapkan editor...");
+                preload("org.fife.ui.rsyntaxtextarea.RSyntaxTextArea");
+                publish("Menyiapkan compiler Java...");
+                preload("javax.tools.ToolProvider");
+                publish("Hampir selesai...");
+                return null;
+            }
+
+            @Override
+            protected void process(List<String> chunks) {
+                splash.setStatus(chunks.get(chunks.size() - 1));
+            }
+
+            @Override
+            protected void done() {
+                try {
+                    get();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                } catch (ExecutionException e) {
+                    System.err.println("Gagal menyiapkan komponen: " + e.getCause());
+                }
+
+                MainFrame frame;
+                try {
+                    frame = new MainFrame(settings);
+                } catch (RuntimeException | LinkageError ex) {
+                    fail(splash, ex);
+                    return;
+                }
+                splash.setStatus("Siap");
+                splash.closeAfterMinimum(MIN_SPLASH_MS, () -> frame.setVisible(true));
+            }
+        }.execute();
+    }
+
+    /** Menutup splash, menampilkan pesan error yang jelas, lalu keluar. */
+    private static void fail(SplashWindow splash, Throwable error) {
+        error.printStackTrace();
+        splash.setVisible(false);
+        splash.dispose();
+
+        StringWriter trace = new StringWriter();
+        error.printStackTrace(new PrintWriter(trace));
+        String detail = trace.toString();
+        if (detail.length() > 1500) {
+            detail = detail.substring(0, 1500) + "\n(dipotong, lihat jendela PowerShell untuk detail lengkap)";
+        }
+        JOptionPane.showMessageDialog(null,
+                "Maaf, " + AppInfo.NAME + " gagal dibuka.\n\n" + detail,
+                AppInfo.NAME, JOptionPane.ERROR_MESSAGE);
+        System.exit(1);
+    }
+
+    /** Memuat class lebih awal (tanpa inisialisasi) agar pembukaan editor nanti lebih cepat. */
+    private static void preload(String className) {
+        try {
+            Class.forName(className, false, Main.class.getClassLoader());
+        } catch (ClassNotFoundException | LinkageError ignored) {
+            // Tidak fatal: class akan dimuat normal saat pertama kali dipakai.
+        }
+    }
+}
